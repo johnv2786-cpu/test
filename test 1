@@ -1,42 +1,15 @@
-# Why Your SCORM Content Only Sends Percentage
+Still the score is not there 
 
-## The Problem Analysis
 
-Your console shows:
-```
-[innerForwarder] posted SCORM_SCORE_UPDATE {raw: '13%', percent: 13, correct: null, total: null, source: 'dom:percent'}
-Score data extracted: {actualScore: null, maxScore: null, percentage: 13, source: 'dom:percent'}
-```
 
-### Key Issue: `source: 'dom:percent'`
+Here is the console in top localhost 
 
-This means your SCORM content is extracting the score **from the page DOM (HTML)**, not from the **SCORM API**.
-
-The innerForwarder is finding a percentage string on the page (like "Score: 13%") and extracting just the number.
-
----
-
-## Why This Happens
-
-SCORM packages vary widely:
-- **Good packages**: Properly set `cmi.score.raw`, `cmi.score.max` in SCORM API
-- **Poor packages**: Only display score in HTML, don't use SCORM API correctly
-- **Very old packages**: Never update SCORM data, just show results on page
-
-Your package appears to be **displaying only percentage in HTML**, not setting actual score values in the SCORM API.
-
----
-
-## Debugging Steps (Try These First)
-
-### Step 1: Check Inner Frame Console
-1. Open your SCORM course in a browser
-2. Open Developer Tools (F12)
-3. Find the iframe named "scormFrame"
-4. In the Console tab, type:
-   ```javascript
-   // Check if SCORM API is available
-   console.log('API available:', typeof API !== 'undefined');
+Top LMS shim installed -> SaveTracking: /LMS/OnlineTraining/ScormTraining/SaveTracking  CompleteAttempt: /LMS/OnlineTraining/ScormTraining/CompleteAttempt
+Launch?packageId=20&sessionId=411&sessionGuid=b19ab475-2d59-405f-89a7-c5687e2eada7:273 SCORM_SCORE_UPDATE handled (raw,percent,src)= null null probe
+Launch?packageId=20&sessionId=411&sessionGuid=b19ab475-2d59-405f-89a7-c5687e2eada7:421 Score data extracted: Object
+Launch?packageId=20&sessionId=411&sessionGuid=b19ab475-2d59-405f-89a7-c5687e2eada7:443 Complete handler posting payload Object
+Launch?packageId=20&sessionId=411&sessionGuid=b19ab475-2d59-405f-89a7-c5687e2eada7:455 CompleteAttempt OK {"success":true,"message":"Attempt marked complete and session closed.","score":{"raw":null,"max":null,"percentage":null}}
+console.log('API available:', typeof API !== 'undefined');
    console.log('API_1484_11 available:', typeof API_1484_11 !== 'undefined');
    
    // Try to get score directly
@@ -44,166 +17,901 @@ Your package appears to be **displaying only percentage in HTML**, not setting a
        console.log('Raw Score:', API.GetValue('cmi.core.score.raw'));
        console.log('Max Score:', API.GetValue('cmi.core.score.max'));
    }
-   ```
-
-### Step 2: Check What HTML the Package Shows
-In the same console:
-```javascript
-// Check what's displayed on the page
+VM269:1 API available: true
+VM269:2 API_1484_11 available: true
+VM269:6 Raw Score: 
+VM269:7 Max Score: 
+undefined
 var doc = frames[0].document;  // or whichever iframe has the content
 console.log(doc.body.innerText);  // See all visible text including score display
-```
+VM275:2 Additional content has been loaded
+SKIP TO LESSON
+Lesson 8 of 8
+Keolis MHI Corporate Induction: Foundations for Success in Dubai Metro & Tram
+Lesson 7 - Strategic Plan and Talent Development: Shaping the Future
+Lesson 8 of 8
+House Rules and the 'Don’t Walk By' Safety Culture at Keolis MHI
+By
+Dubaimetro KM
+House Rules and Safety Culture
 
-### Step 3: Look at Page Source
-Right-click course → View Page Source, search for:
-- `cmi.core.score.raw`
-- `cmi.score.raw`
-- `score.raw`
-- `LMSSetValue`
+In a fast-paced, people-focused environment like Dubai Metro and Tram, a strong safety culture and clear conduct guidelines are essential. Every employee’s commitment to safe, ethical, and responsible behavior is the foundation for personal wellbeing and organizational excellence. By understanding and following house rules, and actively participating in safety initiatives, you help create a workplace where everyone can thrive and passengers feel secure.
 
----
+This lesson will help you understand the key expectations for conduct and safety at Keolis MHI. Review the objectives below to see what you'll learn and be able to do by the end of this module:
 
-## Solution 1: Fix the SCORM Content
+1
 
-If you have access to the SCORM package source:
+Understand House Rules and Conduct
 
-### Look For:
-```javascript
-// BAD - Only showing percentage
-document.getElementById('score').innerHTML = '13%';
+2
 
-// GOOD - Setting SCORM API
-API.SetValue('cmi.core.score.raw', '13');
-API.SetValue('cmi.core.score.max', '100');
-```
+Recognize 'Don’t Walk By' Safety Goals
 
-### What It Should Do:
-```javascript
-// CORRECT SCORM 1.2 implementation
-var correct = 13;
-var total = 100;
+3
 
-// Set in SCORM API
-API.SetValue('cmi.core.score.raw', correct.toString());
-API.SetValue('cmi.core.score.max', total.toString());
+Identify Reportable Incidents and Hazards
 
-// ALSO display to user (optional)
-document.getElementById('score').innerHTML = correct + '/' + total + ' (' + ((correct/total)*100).toFixed(1) + '%)';
-```
+4
 
----
+Use the Digital Reporting System
 
-## Solution 2: Use the Fallback Handler
+Keolis MHI’s house rules set the standard for how all employees are expected to behave at work. These rules cover respect, professionalism, and strict adherence to company policies that keep everyone safe and productive. By following these guidelines, you help protect yourself, your colleagues, and the reputation of Keolis MHI, ensuring a positive experience for both staff and passengers.
 
-If you can't modify the SCORM content, use the fallback solution that tries multiple score extraction methods:
+Key House Rules
 
-**Replace your `finalizeWithScore` function with the one in `SCORM_FALLBACK_FIX.js`**
+Explore each house rule to understand what is expected of you and how to apply these standards in your daily work. Each rule is designed to support a safe, respectful, and efficient workplace for all.
 
-This fallback:
-1. ✅ Tries fraction format first (13/100)
-2. ✅ Falls back to SCORM API (cmi.score.raw, cmi.score.max)
-3. ✅ Falls back to inner frame API calls
-4. ✅ Finally uses percentage if nothing else works
+Professional Conduct and Appearance
+Respectful Behavior Towards Others
+Following Safety Protocols
+Prohibition of Unauthorized Device Use
+Immediate Reporting of Unsafe Conditions
+Every action you take reflects on the safety and reputation of Keolis MHI—adhering to house rules is everyone’s responsibility.
+Introducing the 'Don’t Walk By' Safety Initiative
 
----
+'Don’t Walk By' is Keolis MHI’s flagship safety program, empowering every employee to take an active role in preventing incidents. By reporting hazards, near misses, and suggestions for improvement, you help create a culture where everyone looks out for each other and safety is always a priority.
 
-## Solution 3: Workaround - Parse Score from HTML
+'Don’t Walk By' Essentials
 
-If the package only displays HTML like "Your Score: 13 out of 100", modify your code to extract this:
+Review each flashcard to understand the core concepts of the 'Don’t Walk By' safety initiative and how you can participate.
 
-```javascript
-// In your finalizeWithScore function, add this parsing:
-if (actualScore === null) {
-    try {
-        var frame = document.getElementById('scormFrame');
-        if (frame && frame.contentDocument) {
-            var text = frame.contentDocument.body.innerText;
-            
-            // Pattern 1: "13 out of 100"
-            var m1 = text.match(/(\d+)\s+out\s+of\s+(\d+)/i);
-            if (m1) {
-                actualScore = parseInt(m1[1], 10);
-                maxScore = parseInt(m1[2], 10);
-                percentage = (actualScore / maxScore) * 100;
-                console.log('Extracted from "X out of Y" format:', { actualScore, maxScore, percentage });
-            }
-            
-            // Pattern 2: "Score: 13/100"
-            if (actualScore === null) {
-                var m2 = text.match(/Score:\s*(\d+)\s*\/\s*(\d+)/i);
-                if (m2) {
-                    actualScore = parseInt(m2[1], 10);
-                    maxScore = parseInt(m2[2], 10);
-                    percentage = (actualScore / maxScore) * 100;
-                    console.log('Extracted from "X/Y" format:', { actualScore, maxScore, percentage });
-                }
-            }
-        }
-    } catch (e) {
-        console.log('Error parsing HTML for score:', e);
+Click to flip
+
+What is 'Don’t Walk By'?
+
+Click to flip
+
+A digital reporting system for staff to share safety concerns, environmental issues, and improvement ideas confidentially.
+
+Click to flip
+
+Who Can Report?
+
+Click to flip
+
+All KM staff and contractors are encouraged and empowered to submit reports using the system.
+
+Click to flip
+
+Where Can Reports Be Made?
+
+Click to flip
+
+Reports can be submitted by scanning QR codes found in stations, depots, substations, and transport buses.
+
+Click to flip
+
+Why is Reporting Important?
+
+Click to flip
+
+Reporting helps prevent accidents, improves safety, and ensures everyone’s concerns are heard and addressed.
+
+What to Report Under 'Don’t Walk By'
+
+Expand each section to see the types of issues and observations that should be reported through the 'Don’t Walk By' system. Knowing what to report helps keep everyone safe.
+
+Safety-Related Observations
+Unsafe Conditions
+Near Misses
+Potential or New Hazards/Risks
+Suggestions for Improvement
+How to Report Using 'Don’t Walk By'
+
+Expand each tab to learn the practical steps for submitting a report, where to find QR codes, and how your information is handled. These tips will help you report quickly and confidently.
+
+USING DIGITAL SYSTEM/QR CODES
+LOCATIONS OF QR CODES
+CONFIDENTIALITY AND ANONYMITY
+WHO RECEIVES AND PROCESSES REPORTS
+
+To submit a report, scan the QR code with your mobile device. The QR codes are placed throughout all Dubai Metro and Tram premises, including stations, depots, substations, and buses.
+
+Follow the on-screen instructions to enter details about the observation or suggestion. You can submit reports at any time during your shift.
+
+1
+2
+3
+4
+1 of 6
+Introduction to the Reporting Process
+
+Understanding what happens after you submit a report helps ensure transparency and encourages participation. Here’s what you can expect after making a report.
+
+START
+2 of 6
+Step 1
+Report Submission and Notification
+
+After you submit a report, you will receive a notification and a unique 'Don’t Walk By' report number within 48 hours. This confirms your report has been received and logged.
+
+3 of 6
+Step 2
+Investigation of Unsafe Conditions
+
+Unsafe conditions, potential hazards, or new risks are investigated within 5 working days. The relevant team will assess the situation and take corrective action as needed.
+
+4 of 6
+Step 3
+Investigation of Observations and Near Misses
+
+Reports of safety observations and near misses are investigated within 10 working days. The goal is to understand the root cause and prevent recurrence.
+
+5 of 6
+Step 4
+Follow-Up and Resolution
+
+You will receive follow-up communication regarding the outcome of your report. All actions taken are documented, and your feedback is valued to improve future safety efforts.
+
+6 of 6
+Summary of the Reporting Process
+
+The reporting process is designed to be transparent and responsive, ensuring every concern is addressed promptly and thoroughly. Your participation is vital to maintaining a safe workplace.
+
+START AGAIN
+Roles and Responsibilities in Safety Reporting
+
+Explore the roles involved in the 'Don’t Walk By' process and understand how each group contributes to a safer workplace. Everyone has a part to play in safety.
+
+Reporting Staff/Contractors
+QHSE Department
+Line Managers/Supervisors
+Investigation Teams
+Should You Report It?
+
+Test your understanding by sorting the following scenarios into the correct category. Think carefully about what should be reported under 'Don’t Walk By' to help keep everyone safe.
+
+Current item: Loose floor tile
+Loose floor tile
+Spilled water on concourse
+Unattended bag
+Personal disagreement
+Suggestion for improved signage
+Should Report under Don’t Walk By
+Not Required to Report
+What is the first step you should take if you notice an unsafe condition at your station?
+Try to fix it yourself without telling anyone
+Correctly unselected
+Ignore it if no one is hurt
+Correctly unselected
+Immediately report it using the 'Don’t Walk By' system or to your supervisor
+Correctly selected
+Wait until your next break to mention it
+Correctly unselected
+
+
+Correct
+Immediate reporting ensures hazards are addressed quickly and helps maintain a safe workplace.
+A strong safety culture is built on trust, transparency, and the courage to speak up—your vigilance can prevent accidents and save lives.
+
+The 'Don’t Walk By' initiative and adherence to house rules directly support Keolis MHI’s mission, vision, and values—especially "We Care" and "We Commit." By prioritizing safety and professionalism, you help build trust with passengers, colleagues, and the wider community. Every report and every responsible action strengthens our culture of care and commitment, making Dubai Metro and Tram a safer place for all.
+
+Continued
+
+Congratulations on completing this lesson! As you move forward, remember that safety and professional conduct are at the heart of everything we do at Keolis MHI. By following house rules and embracing the 'Don’t Walk By' safety culture, you play a vital role in protecting yourself, your colleagues, and our passengers. Continue to uphold these standards every day and help us deliver world-class service and safety across Dubai Metro and Tram.
+
+
+Here is the _LearnerScormPlayer 
+@model LMS.Areas.OnlineTraining.Models.ScormLearnerPlayerModel
+
+@{
+    Layout = null;
+    var packageID = Model.citSCORMPackageID;
+    var launchFile = Model.LaunchFile ?? "index.html";
+
+    string packageFolderName = "UNKNOWN";
+    if (!string.IsNullOrEmpty(Model.StoredDirectoryPath))
+    {
+        try { packageFolderName = new System.IO.DirectoryInfo(Model.StoredDirectoryPath).Name; } catch { packageFolderName = "UNKNOWN"; }
     }
+
+    string rootVirtualBase = $"~/Files/ScormFileUpload/{Model.citID}/{packageFolderName}/";
+    string rootPhysicalBase = Server.MapPath(rootVirtualBase);
+
+    string candidate1Physical = System.IO.Path.Combine(rootPhysicalBase ?? "", launchFile);
+    string candidate2Physical = System.IO.Path.Combine(rootPhysicalBase ?? "", "scormcontent", launchFile);
+
+    string proxyFile;
+    string staticLaunchUrl;
+    if (System.IO.File.Exists(candidate1Physical))
+    {
+        proxyFile = launchFile;
+        staticLaunchUrl = Url.Content(rootVirtualBase + launchFile);
+    }
+    else if (System.IO.File.Exists(candidate2Physical))
+    {
+        proxyFile = "scormcontent/" + launchFile;
+        staticLaunchUrl = Url.Content(rootVirtualBase + "scormcontent/" + launchFile);
+    }
+    else
+    {
+        proxyFile = "scormcontent/" + launchFile;
+        staticLaunchUrl = Url.Content(rootVirtualBase + "scormcontent/" + launchFile);
+    }
+
+    var proxyUrl = Url.Action("ServeScorm", "ScormTraining", new { area = "OnlineTraining", packageId = Model.citSCORMPackageID, file = proxyFile });
+    var saveTrackingUrl = Url.Action("SaveTracking", "ScormTraining", new { area = "OnlineTraining" });
+    var completeAttemptUrl = Url.Action("CompleteAttempt", "ScormTraining", new { area = "OnlineTraining" });
 }
-```
 
----
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@Model.PackageName - SCORM Player</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
 
-## Recommended Action Plan
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+            background: #fff;
+        }
 
-### For Each SCORM Package:
+        .header {
+            background: linear-gradient(135deg,#18abc0,#0f8fa3);
+            color: #fff;
+            padding: 12px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: fixed;
+            top: 0;
+            width: 100%;
+            z-index: 1000;
+            box-shadow: 0 2px 8px rgba(0,0,0,.08);
+        }
 
-**Step A: Identify Package Type**
-1. Does it have proper SCORM API calls? (Run debugging Step 1 above)
-   - YES → Move to Step B
-   - NO → Move to Step C
+        .header-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
 
-**Step B: Proper SCORM Package**
-- Implement solution that extracts from SCORM API
-- Use the fallback handler provided
-- Should work correctly ✅
+        .scorm-frame {
+            width: 100%;
+            height: calc(100vh - 64px);
+            border: 0;
+            margin-top: 64px;
+            display: block;
+        }
 
-**Step C: Poor SCORM Package (HTML-only scores)**
-- Contact package vendor → Ask them to fix SCORM API calls
-- If they won't fix it:
-  - Use Solution 2 (fallback handler) to try API extraction
-  - Use Solution 3 (HTML parsing) as last resort
-  - Document score accuracy issues
+        .btn {
+            background: rgba(255,255,255,.14);
+            border: 1px solid rgba(255,255,255,.22);
+            color: #fff;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+        }
 
----
+            .btn:hover {
+                background: rgba(255,255,255,.2);
+            }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div>
+            <strong>📚 @Model.PackageName</strong>
+            <small style="opacity:.85; margin-left:8px;">Attempt #@Model.AttemptNumber</small>
+        </div>
+        <div class="header-actions">
+            <button id="complete-btn" class="btn" type="button">Complete</button>
+            <button class="btn" onclick="toggleFullscreen()">⛶ Fullscreen</button>
+            <button class="btn" onclick="window.close()">✕ Close</button>
+        </div>
+    </div>
 
-## Testing Your Fix
+    <script>
+        var SCORM = @Html.Raw(System.Web.Helpers.Json.Encode(new {
+            packageId = Model.citSCORMPackageID,
+            attemptId = Model.citSCORMAttemptID,
+            sessionId = Model.citSCORMSessionID,
+            sessionGuid = Model.SessionGUID,
+            userId = (String.IsNullOrEmpty(Model.LearnerKMID) ? (object)null : Model.LearnerKMID),
+            scormVersion = (Model.ScormVersion ?? "1.2")
+        }));
+        var PROXY_URL = @Html.Raw(System.Web.Helpers.Json.Encode(proxyUrl));
+        var SAVE_TRACKING_URL = @Html.Raw(System.Web.Helpers.Json.Encode(saveTrackingUrl));
+        var COMPLETE_ATTEMPT_URL = @Html.Raw(System.Web.Helpers.Json.Encode(completeAttemptUrl));
 
-1. **Before implementing fallback:**
-   ```
-   Console: {actualScore: null, maxScore: null, percentage: 13}
-   Database: RawScore = 13, MaxScore = null
-   ```
+        // larger wait to catch slow engines
+        var SCORE_WAIT_MS = 3000;
+    </script>
 
-2. **After implementing fallback:**
-   ```
-   Console: {actualScore: 13, maxScore: 100, percentage: 13}
-   Database: RawScore = 13, MaxScore = 100  ✅
-   ```
+    <script>
+        (function () {
+            var SAVE = SAVE_TRACKING_URL;
+            var COMPLETE = COMPLETE_ATTEMPT_URL;
+            var COMMIT_THROTTLE = 800;
 
----
+            var lastValues = {};
+            try { window.__scorm_shim_lastValues = lastValues; } catch (e) { }
 
-## What To Tell Your Vendor
+            // keep last reported score for fast access
+            try { window.__lastReportedScore = null; } catch (e) { }
 
-If contacting the SCORM package vendor:
+            function postJson(url, payload) {
+                return fetch(url, {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: { 'Content-Type': 'application/json; charset=utf-8' },
+                    body: JSON.stringify(payload)
+                }).then(function (res) {
+                    if (!res.ok) return res.text().then(function (t) { return Promise.reject({ status: res.status, body: t }); });
+                    return res.text().then(function (t) { try { return t ? JSON.parse(t) : null; } catch (e) { return t; } });
+                });
+            }
 
-> "Our LMS needs SCORM packages to properly set `cmi.core.score.raw` and `cmi.core.score.max` values via the SCORM API. Currently, your package only displays a percentage on the page but doesn't update these SCORM data elements. Please update your package to call:
-> 
-> ```
-> API.SetValue('cmi.core.score.raw', correctAnswers);
-> API.SetValue('cmi.core.score.max', totalQuestions);
-> ```
+            function saveOne(element, value, committed) {
+                var uid = (SCORM && SCORM.userId) ? (typeof SCORM.userId === 'number' ? SCORM.userId : parseInt(SCORM.userId, 10)) : null;
+                if (!uid) return Promise.reject({ message: 'Missing userId' });
+                var payload = { citSCORMSessionID: SCORM.sessionId || 0, citSCORMAttemptID: SCORM.attemptId || 0, UserID: uid, citSCORMPackageID: SCORM.packageId || 0, CMIElement: element, CMIValue: value, CMITimestamp: new Date().toISOString(), IsCommitted: committed ? 1 : 0 };
+                return postJson(SAVE, payload);
+            }
 
----
+            function commitMarker() {
+                var now = Date.now();
+                if (window.__lastCommitTs && now - window.__lastCommitTs < COMMIT_THROTTLE) return;
+                window.__lastCommitTs = now;
+                saveOne('lms.commit', '1', true).catch(function () { });
+            }
 
-## Summary
+            function parseScore(raw) {
+                if (raw === undefined || raw === null || raw === '') return null;
+                try {
+                    var s = ('' + raw).trim().replace(',', '.');
+                    var m = s.match(/^([0-9]+(?:\.[0-9]+)?)\s*%$/);
+                    if (m) return parseFloat(m[1]);
+                    m = s.match(/^([0-9]+(?:\.[0-9]+)?)\s*\/\s*([0-9]+(?:\.[0-9]+)?)$/);
+                    if (m && parseFloat(m[2]) !== 0) return (parseFloat(m[1]) / parseFloat(m[2])) * 100;
+                    var n = parseFloat(s);
+                    if (!isNaN(n)) return (n <= 1 ? n * 100 : n);
+                } catch (e) { }
+                return null;
+            }
 
-| Issue | Cause | Solution |
-|-------|-------|----------|
-| `source: 'dom:percent'` | Package only shows % in HTML | Ask vendor to implement SCORM API calls |
-| `correct: null, total: null` | No fraction data sent | Use fallback handler |
-| `RawScore stored as 13` | Percentage treated as score | Store with MaxScore to differentiate |
+            function isCompletedStatus(v) {
+                if (v === undefined || v === null) return false;
+                var s = ('' + v).toLowerCase().trim();
+                return s === 'completed' || s === 'passed' || s === 'success' || s === 'completed,passed' || s === 'completed/passed';
+            }
 
+            // aggressive wait for score; first checks __lastReportedScore (fast)
+            function waitForScore(timeoutMs) {
+                return new Promise(function (resolve) {
+                    var elapsed = 0;
+                    var interval = 150;
+                    function tryOnce() {
+                        try {
+                            // first: lastReportedScore if set by message handler
+                            if (window.__lastReportedScore !== undefined && window.__lastReportedScore !== null) {
+                                var rr = parseFloat(('' + window.__lastReportedScore).replace(',', '.'));
+                                if (!isNaN(rr)) { resolve(rr <= 1 ? rr * 100 : rr); return; }
+                            }
+                            // second: shim lastValues
+                            var lv = window.__scorm_shim_lastValues || {};
+                            var keys = ['cmi.core.score.raw', 'cmi.score.raw', 'cmi.score.scaled', 'cmi.core.score.scaled'];
+                            for (var i = 0; i < keys.length; i++) {
+                                var v = lv[keys[i]];
+                                if (v !== undefined && v !== null && v !== '') {
+                                    var p = parseScore(v);
+                                    if (p !== null) { resolve(p); return; }
+                                }
+                            }
+                            // third: forwarded window._forwardedValues
+                            if (window._forwardedValues) {
+                                var f = window._forwardedValues['cmi.core.score.raw'] || window._forwardedValues['cmi.score.raw'];
+                                if (f) { var pf = parseScore(f); if (pf !== null) { resolve(pf); return; } }
+                            }
+                            // vendor heuristics inside inner frame
+                            try {
+                                var frame = document.getElementById('scormFrame');
+                                if (frame && frame.contentWindow) {
+                                    var iw = frame.contentWindow;
+                                    if (typeof iw.GetPlayer === 'function') {
+                                        try {
+                                            var player = iw.GetPlayer();
+                                            if (player && typeof player.GetVar === 'function') {
+                                                var val = player.GetVar('Score') || player.GetVar('PlayerScore') || player.GetVar('QuizScore');
+                                                var pv = parseScore(val);
+                                                if (pv !== null) { resolve(pv); return; }
+                                            }
+                                        } catch (e) { }
+                                    }
+                                    if (iw.cp && typeof iw.cp.getVariableValue === 'function') {
+                                        try {
+                                            var cv = iw.cp.getVariableValue('cpInfoScore') || iw.cp.getVariableValue('cpQuizInfoPointsscored');
+                                            var pc = parseScore(cv);
+                                            if (pc !== null) { resolve(pc); return; }
+                                        } catch (e) { }
+                                    }
+                                    try {
+                                        if (iw.scorm_runtime) {
+                                            var sr = iw.scorm_runtime._score || iw.scorm_runtime.score;
+                                            var ps = parseScore(sr);
+                                            if (ps !== null) { resolve(ps); return; }
+                                        }
+                                    } catch (e) { }
+                                    // inner DOM heuristics
+                                    try {
+                                        var doc = frame.contentDocument || frame.contentWindow.document;
+                                        if (doc) {
+                                            var text = (doc.body && doc.body.innerText) || '';
+                                            var m = text.match(/([0-9]{1,3}(?:\.[0-9]+)?)\s*%/);
+                                            if (m) { resolve(parseFloat(m[1])); return; }
+                                        }
+                                    } catch (e) { }
+                                }
+                            } catch (e) { }
+                        } catch (e) { }
+                        elapsed += interval;
+                        if (elapsed >= timeoutMs) { resolve(null); return; }
+                        setTimeout(tryOnce, interval);
+                    }
+                    tryOnce();
+                });
+            }
+
+            // expose wait
+            try { window.__scorm_waitForScore = waitForScore; } catch (e) { }
+
+            // message listener - set __lastReportedScore ASAP and persist
+            window.addEventListener('message', function (ev) {
+                if (ev.origin !== window.location.origin) return;
+                try {
+                    var d = ev.data || {};
+                    if (d && d.type === 'SCORM_SCORE_UPDATE') {
+                        // try scorePercent first
+                        var percent = null;
+                        if (d.scorePercent !== undefined && d.scorePercent !== null) {
+                            percent = parseFloat(('' + d.scorePercent).replace(',', '.'));
+                            if (!isNaN(percent)) percent = percent <= 1 ? percent * 100 : percent;
+                        }
+                        // fallback: parse raw string, look for fraction "2/16"
+                        if (percent === null && d.scoreRaw !== undefined && d.scoreRaw !== null) {
+                            var raw = '' + d.scoreRaw;
+                            // fraction pattern
+                            var frac = raw.match(/^\s*([0-9]+)\s*\/\s*([0-9]+)\s*$/);
+                            if (frac) {
+                                var correct = parseInt(frac[1], 10), total = parseInt(frac[2], 10);
+                                if (!isNaN(correct) && !isNaN(total) && total > 0) {
+                                    percent = (correct / total) * 100;
+                                    // optional: send correct & total to server instead of percent
+                                    window.__lastReportedCount = { correct: correct, total: total };
+                                }
+                            } else {
+                                // attempt numeric parse (like "12.5" or "12.5%")
+                                var p = parseFloat(raw.replace('%', '').replace(',', '.'));
+                                if (!isNaN(p)) percent = (p <= 1 ? p * 100 : p);
+                            }
+                        }
+
+                        // set global lastReportedScore (percent) and persist
+                        window.__lastReportedScore = (percent !== null ? percent : null);
+                        // keep raw for debugging
+                        window.__lastReportedRaw = d.scoreRaw === undefined ? null : d.scoreRaw;
+                        window.__lastReportedSource = d.source || null;
+
+                        // persist CMI score as before (we still post the raw string to SaveTracking so DB has original)
+                        try {
+                            if (d.scoreRaw !== undefined && d.scoreRaw !== null) {
+                                saveOne('cmi.core.score.raw', String(d.scoreRaw), false).catch(function () { });
+                            } else if (percent !== null) {
+                                // if raw absent use percent formatted string
+                                saveOne('cmi.core.score.raw', String(percent), false).catch(function () { });
+                            }
+                        } catch (e) { }
+
+                        // trigger finish if appropriate
+                        setTimeout(function () { try { finishIfCompleted(); } catch (e) { } }, 120);
+                        console.debug('SCORM_SCORE_UPDATE handled (raw,percent,src)=', d.scoreRaw, percent, d.source);
+                    }
+                } catch (e) { }
+            }, false);
+
+            // shim API so same-origin SCO can call LMSSetValue and be persisted
+            var shimApi = {
+                LMSInitialize: function () { return 'true'; },
+                LMSFinish: function () { commitMarker(); setTimeout(function () { try { finishIfCompleted(); } catch (e) { } }, 250); return 'true'; },
+                LMSGetValue: function (k) { return lastValues[k] !== undefined ? String(lastValues[k]) : ''; },
+                LMSSetValue: function (k, v) {
+                    try {
+                        lastValues[k] = v;
+                        // update lastReportedScore if it's a score key
+                        if (/score/i.test(k)) {
+                            var p = parseScore(v);
+                            if (p !== null) window.__lastReportedScore = p;
+                        }
+                        saveOne(k, v, false).catch(function () { });
+                        var lk = (k || '').toLowerCase();
+                        if (lk.indexOf('lesson_status') !== -1 || lk.indexOf('completion_status') !== -1 || lk.indexOf('success_status') !== -1) {
+                            if (isCompletedStatus(v)) {
+                                commitMarker();
+                                setTimeout(function () { try { finishIfCompleted(); } catch (e) { } }, 200);
+                            }
+                        }
+                    } catch (e) { }
+                    return 'true';
+                },
+                LMSCommit: function () { commitMarker(); return 'true'; },
+                LMSGetLastError: function () { return '0'; },
+                LMSGetErrorString: function () { return ''; },
+                LMSGetDiagnostic: function () { return ''; }
+            };
+
+            shimApi.Initialize = shimApi.LMSInitialize;
+            shimApi.Terminate = shimApi.LMSFinish;
+            shimApi.GetValue = shimApi.LMSGetValue;
+            shimApi.SetValue = shimApi.LMSSetValue;
+            shimApi.Commit = shimApi.LMSCommit;
+
+            function safeDefine(target, name, value) {
+                try { Object.defineProperty(target, name, { value: value, writable: true, configurable: true }); return true; }
+                catch (e) { try { target[name] = value; return true; } catch (ex) { return false; } }
+            }
+
+            safeDefine(window, 'API', shimApi);
+            safeDefine(window, 'API_1484_11', shimApi);
+            try { if (window.parent && window.parent !== window) safeDefine(window.parent, 'API', shimApi); } catch (e) { }
+            try { if (window.parent && window.parent !== window) safeDefine(window.parent, 'API_1484_11', shimApi); } catch (e) { }
+            try { if (window.top && window.top !== window) safeDefine(window.top, 'API', shimApi); } catch (e) { }
+            try { if (window.top && window.top !== window) safeDefine(window.top, 'API_1484_11', shimApi); } catch (e) { }
+
+            console.debug('Top LMS shim installed -> SaveTracking:', SAVE, ' CompleteAttempt:', COMPLETE);
+        })();
+    </script>
+
+    <iframe id="scormFrame" class="scorm-frame" title="SCORM Player" src="@proxyUrl" frameborder="0" sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups"></iframe>
+
+    <script>
+        (function () {
+            var btn = document.getElementById('complete-btn');
+            if (!btn) return;
+
+            btn.addEventListener('click', function () {
+                var self = this;
+                self.disabled = true;
+                self.textContent = 'Completing…';
+
+                // 1) Ask inner to probe for score immediately
+                try {
+                    var f = document.getElementById('scormFrame');
+                    if (f && f.contentWindow) {
+                        f.contentWindow.postMessage({ type: 'SCORM_REQUEST_SCORE' }, location.origin);
+                    }
+                } catch (e) { }
+
+                // 2) Wait for the forwarded score (fast path: __lastReportedScore), give inner 900ms to respond
+                var waitMs = 900;
+                var start = Date.now();
+                (function pollScore() {
+                    var reported = window.__lastReportedScore !== undefined ? window.__lastReportedScore : null;
+                    // Also check shim values
+                    try {
+                        var lv = window.__scorm_shim_lastValues || {};
+                        if (!reported && lv['cmi.core.score.raw']) {
+                            var p = parseFloat(('' + lv['cmi.core.score.raw']).replace(',', '.'));
+                            if (!isNaN(p)) reported = (p <= 1 ? p * 100 : p);
+                        }
+                    } catch (e) { }
+
+                    if (reported !== null) {
+                        // we have a score; persist lesson_status then call CompleteAttempt with score
+                        finalizeWithScore(reported, self);
+                        return;
+                    }
+                    if (Date.now() - start >= waitMs) {
+                        // no score received within wait window -> write lesson_status then post CompleteAttempt (fallback)
+                        finalizeWithScore(null, self);
+                        return;
+                    }
+                    setTimeout(pollScore, 120);
+                })();
+            });
+
+            function finalizeWithScore(score, btnEl) {
+                try {
+                    // write lesson_status to SaveTracking
+                    try {
+                        window.__scorm_shim_lastValues = window.__scorm_shim_lastValues || {};
+                        window.__scorm_shim_lastValues['cmi.core.lesson_status'] = 'completed';
+                    } catch (e) { }
+
+                    fetch(SAVE_TRACKING_URL, {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: { 'Content-Type': 'application/json; charset=utf-8' },
+                        body: JSON.stringify({
+                            citSCORMSessionID: SCORM.sessionId || 0,
+                            citSCORMAttemptID: SCORM.attemptId || 0,
+                            UserID: (function (u) {
+                                if (!u && u !== 0) return null;
+                                if (typeof u === 'number') return Math.floor(u);
+                                var n = parseInt(String(u), 10);
+                                return isNaN(n) ? null : n;
+                            })(SCORM.userId),
+                            citSCORMPackageID: SCORM.packageId || 0,
+                            CMIElement: 'cmi.core.lesson_status',
+                            CMIValue: 'completed',
+                            CMITimestamp: new Date().toISOString(),
+                            IsCommitted: 0
+                        })
+                    }).catch(function () { });
+                } catch (e) { }
+
+                // ==================== KEY FIX ====================
+                // Extract ACTUAL SCORE DATA (correct/total), not just percentage
+                var actualScore = null;
+                var maxScore = null;
+                var percentage = score; // fallback percentage
+
+                // Check if we captured correct/total counts from SCORM_SCORE_UPDATE
+                if (window.__lastReportedCount && window.__lastReportedCount.correct !== undefined) {
+                    actualScore = window.__lastReportedCount.correct;
+                    maxScore = window.__lastReportedCount.total;
+                    percentage = (actualScore / maxScore) * 100;
+                }
+
+                console.debug('Score data extracted:', {
+                    actualScore: actualScore,
+                    maxScore: maxScore,
+                    percentage: percentage,
+                    source: window.__lastReportedSource
+                });
+
+                // ===================================================
+                // Now call CompleteAttempt with ACTUAL score and max score
+                var payload = {
+                    citSCORMAttemptID: SCORM.attemptId || 0,
+                    citSCORMSessionID: SCORM.sessionId || 0,
+                    RawScore: actualScore !== null ? actualScore : null, // ACTUAL POINTS (15)
+                    MaxScore: maxScore !== null ? maxScore : null, // MAX POSSIBLE (100)
+                    ScorePercentage: percentage !== null ? percentage : null, // PERCENTAGE (15%)
+                    IsCompleted: true,
+                    CompletionDate: new Date().toISOString(),
+                    LessonStatus: 'completed',
+                    SessionTime: null,
+                    SuspendData: null
+                };
+
+                console.debug('Complete handler posting payload', payload);
+                fetch(COMPLETE_ATTEMPT_URL, {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: { 'Content-Type': 'application/json; charset=utf-8' },
+                    body: JSON.stringify(payload)
+                })
+                    .then(function (res) {
+                        if (!res.ok) return res.text().then(function (t) { throw { status: res.status, body: t }; });
+                        return res.text();
+                    })
+                    .then(function (txt) {
+                        console.debug('CompleteAttempt OK', txt);
+                        alert('Completed' + (payload.RawScore ? ' (score: ' + payload.RawScore + '/' + (payload.MaxScore || '?') + ')' : ''));
+                    })
+                    .catch(function (err) {
+                        console.error('CompleteAttempt failed', err);
+                        alert('CompleteAttempt failed (see console)');
+                    })
+                    .finally(function () {
+                        btnEl.disabled = false;
+                        btnEl.textContent = 'Complete';
+                    });
+            }
+        })();
+
+        function toggleFullscreen() {
+            try {
+                if (!document.fullscreenElement) document.documentElement.requestFullscreen && document.documentElement.requestFullscreen();
+                else document.exitFullscreen && document.exitFullscreen();
+            } catch (e) { }
+        }
+    </script>
+
+    <script src="~/Scripts/Custom/scorm-bootstrap.js"></script>
+</body>
+</html>
+
+Here is the 
+
+Reference is the imsmanifest
+
+<?xml version="1.0" ?>
+<manifest
+  identifier="AUmL63HoCKiB2E-D5sPczf-HWLtHfwiO366NG2x5"
+  version="1"
+  xmlns="http://www.imsproject.org/xsd/imscp_rootv1p1p2"
+  xmlns:adlcp="http://www.adlnet.org/xsd/adlcp_rootv1p2"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://www.imsproject.org/xsd/imscp_rootv1p1p2 imscp_rootv1p1p2.xsd
+                      http://www.adlnet.org/xsd/adlcp_rootv1p2 adlcp_rootv1p2.xsd"
+>
+  <metadata>
+    <schema>ADL SCORM</schema>
+    <schemaversion>1.2</schemaversion>
+    <adlcp:location>metadata.xml</adlcp:location>
+  </metadata>
+  <organizations default="articulate_rise">
+      <organization identifier="articulate_rise">
+      <title>Keolis MHI Corporate Induction: Foundations for Success in Dubai Metro &amp; Tram</title>
+      <item identifier="i1" identifierref="r1" isvisible="true">
+        <title>Keolis MHI Corporate Induction: Foundations for Success in Dubai Metro &amp; Tram</title>
+        <adlcp:datafromlms>datafromlms</adlcp:datafromlms>
+      </item>
+    </organization>
+  </organizations>
+  <resources>
+    <resource identifier="r1" type="webcontent" adlcp:scormtype="sco" href="scormdriver/indexAPI.html">
+      
+        <file href="scormcontent/lib/rise/35369759.js" />
+      
+        <file href="scormcontent/lib/rise/acb578a7.js" />
+      
+        <file href="scormcontent/lib/rise/c5f885ce.css" />
+      
+        <file href="scormcontent/lib/mondrian/entry.js" />
+      
+        <file href="scormcontent/lib/mondrian/dec9fc60.js" />
+      
+        <file href="scormcontent/lib/mondrian/53ca4aa5.js" />
+      
+        <file href="scormcontent/lib/learn_dist/entry.js" />
+      
+        <file href="scormcontent/lib/learn_dist/9b1f8619.js" />
+      
+        <file href="scormcontent/lib/mondrian/76f53f37.js" />
+      
+        <file href="scormcontent/lib/learn_dist/a505eb4f.css" />
+      
+        <file href="scormcontent/lib/mondrian/3868877e.js" />
+      
+        <file href="scormcontent/lib/mondrian/5d56aa22.js" />
+      
+        <file href="scormcontent/lib/learn_dist/a9b6c0d9.js" />
+      
+        <file href="scormcontent/lib/rise/a2c51a23.js" />
+      
+        <file href="scormcontent/lib/sandbox/sandbox.html" />
+      
+        <file href="scormcontent/lib/sandbox/c77685df.js" />
+      
+        <file href="scormcontent/lib/sandbox/4adfab46.css" />
+      
+        <file href="scormcontent/lib/rise/f33ea558.css" />
+      
+        <file href="scormcontent/lib/rise/69c71160.js" />
+      
+        <file href="scormcontent/lib/rise/9aede266.ttf" />
+      
+        <file href="scormcontent/lib/rise/bff47411.woff" />
+      
+        <file href="scormcontent/lib/rise/53e38ae4.js" />
+      
+        <file href="scormcontent/lib/rise/909c140b.js" />
+      
+        <file href="scormcontent/lib/rise/e220a064.js" />
+      
+        <file href="scormcontent/lib/rise/4f596277.js" />
+      
+        <file href="scormcontent/lib/rise/3125981b.js" />
+      
+        <file href="scormcontent/lib/rise/a9538796.js" />
+      
+        <file href="scormcontent/lib/rise/a71d8801.js" />
+      
+        <file href="scormcontent/lib/rise/8716f7be.js" />
+      
+        <file href="scormcontent/lib/rise/1453f27d.js" />
+      
+        <file href="scormcontent/lib/rise/43889eaa.js" />
+      
+        <file href="scormcontent/lib/rise/b4fdee4f.js" />
+      
+        <file href="scormcontent/lib/rise/7d5fe321.js" />
+      
+        <file href="scormcontent/lib/rise/682f02bd.js" />
+      
+        <file href="scormcontent/lib/rise/2b9faa96.js" />
+      
+        <file href="scormcontent/lib/rise/ff9718bb.js" />
+      
+        <file href="scormcontent/lib/rise/f1f77d3c.js" />
+      
+        <file href="scormcontent/lib/rise/b9956f1f.js" />
+      
+        <file href="scormcontent/lib/rise/eb06fbc9.js" />
+      
+        <file href="scormdriver/driverOptions.js" />
+      
+        <file href="scormdriver/indexAPI.html" />
+      
+        <file href="scormdriver/goodbye.html" />
+      
+        <file href="scormcontent/assets/fbe75669-dc0f-443c-ba1b-38f1a34d936f.jpg" />
+      
+        <file href="scormcontent/assets/2834e20d-f64e-4b23-9bec-45242ebfcc35.jpg" />
+      
+        <file href="scormcontent/assets/c1610b4f-16eb-4c69-8811-9451e6489d22.jpg" />
+      
+        <file href="scormcontent/assets/84f79b94-f4d5-4f55-8cf5-a70def71d2a2.jpg" />
+      
+        <file href="scormcontent/index.html" />
+      
+        <file href="scormdriver/lib/dist/5306ddc2.js" />
+      
+        <file href="scormcontent/lib/dist/c45a9871.js" />
+      
+        <file href="scormcontent/assets/small.png" />
+      
+        <file href="scormdriver/lms-interface.js" />
+      
+        <file href="scormdriver/scormdriver.js" />
+      
+        <file href="scormcontent/assets/2bc9b182-4e2b-406f-8fbd-af3247b5f376.mp3" />
+      
+        <file href="scormdriver/blank.html" />
+      
+        <file href="scormdriver/auto-scripts/AutoCompleteSCO.js" />
+      
+        <file href="scormcontent/lib/fonts/Lato2-Regular.woff" />
+      
+        <file href="scormdriver/AICCComm.html" />
+      
+        <file href="scormcontent/lib/fonts/Lato2-Italic.woff" />
+      
+        <file href="scormdriver/auto-scripts/CourseExit.js" />
+      
+        <file href="scormcontent/lib/fonts/Lato2-Light.woff" />
+      
+        <file href="scormcontent/lib/fonts/Merriweather-Black.woff" />
+      
+        <file href="scormdriver/browsersniff.js" />
+      
+        <file href="scormcontent/lib/fonts/Lato2-Bold.woff" />
+      
+        <file href="scormcontent/assets/1c6fc6de-ff3b-451c-98fb-bd0c6ba0fd0a.mp3" />
+      
+        <file href="scormcontent/lib/fonts/Lato2-Black.woff" />
+      
+        <file href="scormcontent/lib/fonts/Merriweather-Light.woff" />
+      
+        <file href="scormcontent/lib/fonts/Merriweather-Regular.woff" />
+      
+        <file href="scormcontent/lib/fonts/Merriweather-Bold.woff" />
+      
+        <file href="scormdriver/auto-scripts/AutoBookmark.js" />
+      
+        <file href="scormcontent/lib/fonts/Merriweather-Italic.woff" />
+      
+        <file href="scormcontent/runtime-data.js" />
+      
+    </resource>
+  </resources>
+</manifest>
