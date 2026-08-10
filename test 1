@@ -1,237 +1,451 @@
-# Articulate Rise - SCORM Score Not Being Sent
+// ============================================================
+// ARTICULATE RISE SCORE EXTRACTION
+// Add this to your finalizeWithScore function
+// ============================================================
 
-## Problem
+function finalizeWithScore(score, btnEl) {
+    try {
+        window.__scorm_shim_lastValues = window.__scorm_shim_lastValues || {};
+        window.__scorm_shim_lastValues['cmi.core.lesson_status'] = 'completed';
+    } catch (e) { }
 
-Your Articulate Rise course:
-- ✅ Shows quiz questions and choices
-- ✅ Tracks correct/incorrect answers (shows "Correctly selected")
-- ✅ Displays quiz results to the learner
-- ❌ **Does NOT send score to SCORM API** (`cmi.score.raw` is empty)
+    fetch(SAVE_TRACKING_URL, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json; charset=utf-8' },
+        body: JSON.stringify({
+            citSCORMSessionID: SCORM.sessionId || 0,
+            citSCORMAttemptID: SCORM.attemptId || 0,
+            UserID: (function (u) {
+                if (!u && u !== 0) return null;
+                if (typeof u === 'number') return Math.floor(u);
+                var n = parseInt(String(u), 10);
+                return isNaN(n) ? null : n;
+            })(SCORM.userId),
+            citSCORMPackageID: SCORM.packageId || 0,
+            CMIElement: 'cmi.core.lesson_status',
+            CMIValue: 'completed',
+            CMITimestamp: new Date().toISOString(),
+            IsCommitted: 0
+        })
+    }).catch(function () { });
 
-**Console shows:**
-```
-Raw Score:      ← EMPTY
-Max Score:      ← EMPTY
-SCORM_SCORE_UPDATE = null null
-```
+    // ==================== ARTICULATE RISE FIX ====================
+    var actualScore = null;
+    var maxScore = null;
+    var percentage = score;
 
----
+    // TRY METHOD 1: Extract from SCORM API (if course sets it)
+    try {
+        var lv = window.__scorm_shim_lastValues || {};
+        var rawScore = lv['cmi.score.raw'] || lv['cmi.core.score.raw'];
+        var maxScoreVal = lv['cmi.score.max'] || lv['cmi.core.score.max'];
+        
+        if (rawScore !== undefined && rawScore !== null && rawScore !== '') {
+            var raw = parseFloat(('' + rawScore).replace(',', '.'));
+            if (!isNaN(raw) && raw >= 0) {
+                actualScore = raw;
+                if (maxScoreVal !== undefined && maxScoreVal !== null && maxScoreVal !== '') {
+                    var max = parseFloat(('' + maxScoreVal).replace(',', '.'));
+                    if (!isNaN(max) && max > 0) {
+                        maxScore = max;
+                        percentage = (actualScore / maxScore) * 100;
+                    }
+                }
+                console.debug('Score from SCORM API:', { actualScore, maxScore, percentage });
+            }
+        }
+    } catch (e) {
+        console.debug('No SCORM API score available');
+    }
 
-## Why This Happens
+    // TRY METHOD 2: Extract from iframe inner content (Articulate Rise results)
+    if (actualScore === null) {
+        try {
+            var frame = document.getElementById('scormFrame');
+            if (frame && frame.contentWindow) {
+                var iw = frame.contentWindow;
+                
+                // Look for Articulate Rise quiz results in the DOM
+                // Pattern 1: Look for "Correctly selected" / "Correctly unselected" counters
+                try {
+                    var doc = frame.contentDocument || iw.document;
+                    if (doc && doc.body) {
+                        var text = doc.body.innerText || '';
+                        
+                        // Count "Correctly selected" (correct answers)
+                        var correctMatches = (text.match(/Correctly selected/gi) || []).length;
+                        
+                        // Try to find total questions
+                        // Pattern: "Question X of Y" or similar
+                        var totalMatch = text.match(/(\d+)\s+of\s+(\d+)/);
+                        if (totalMatch) {
+                            actualScore = parseInt(totalMatch[1], 10);
+                            maxScore = parseInt(totalMatch[2], 10);
+                            percentage = (actualScore / maxScore) * 100;
+                            console.debug('Score from "X of Y" pattern:', { actualScore, maxScore, percentage });
+                        }
+                        
+                        // If not found, use correctMatches count
+                        if (actualScore === null && correctMatches > 0) {
+                            // This is a rough estimate
+                            console.log('Found correct answers count:', correctMatches);
+                        }
+                    }
+                } catch (e) {
+                    console.debug('Error examining iframe content:', e);
+                }
+                
+                // Pattern 2: Look for Articulate Rise result text like "You scored 85%"
+                try {
+                    var resultText = iw.document.body.innerText || '';
+                    var scoreMatch = resultText.match(/You\s+(?:scored|got)\s+(\d+(?:\.\d+)?)\s*(?:%)?/i);
+                    if (scoreMatch && actualScore === null) {
+                        percentage = parseFloat(scoreMatch[1]);
+                        console.debug('Score from result text:', { percentage });
+                    }
+                } catch (e) { }
+            }
+        } catch (e) {
+            console.debug('Error extracting from iframe:', e);
+        }
+    }
 
-Articulate Rise is a modern authoring tool that can create SCORM content, but:
+    console.debug('Final score data:', {
+        actualScore: actualScore,
+        maxScore: maxScore,
+        percentage: percentage,
+        source: window.__lastReportedSource
+    });
 
-1. **The course tracks quiz results internally** (shows answers, displays feedback)
-2. **But SCORM score reporting is disabled** in the course settings
-3. **Result:** LMS sees completion but no score data
+    // ===================================================
+    var payload = {
+        citSCORMAttemptID: SCORM.attemptId || 0,
+        citSCORMSessionID: SCORM.sessionId || 0,
+        RawScore: actualScore !== null ? actualScore : null,
+        MaxScore: maxScore !== null ? maxScore : null,
+        ScorePercentage: percentage !== null ? percentage : null,
+        IsCompleted: true,
+        CompletionDate: new Date().toISOString(),
+        LessonStatus: 'completed',
+        SessionTime: null,
+        SuspendData: null
+    };
 
----
+    console.debug('Complete handler posting payload', payload);
+    fetch(COMPLETE_ATTEMPT_URL, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json; charset=utf-8' },
+        body: JSON.stringify(payload)
+    })
+        .then(function (res) {
+            if (!res.ok) return res.text().then(function (t) { throw { status: res.status, body: t }; });
+            return res.text();
+        })
+        .then(function (txt) {
+            console.debug('CompleteAttempt OK', txt);
+            var scoreText = actualScore !== null 
+                ? ' (score: ' + actualScore + (maxScore ? '/' + maxScore : '') + ')' 
+                : (percentage !== null ? ' (score: ' + percentage.toFixed(1) + '%)' : '');
+            alert('Completed' + scoreText);
+        })
+        .catch(function (err) {
+            console.error('CompleteAttempt failed', err);
+            alert('CompleteAttempt failed (see console)');
+        })
+        .finally(function () {
+            btnEl.disabled = false;
+            btnEl.textContent = 'Complete';
+        });
+}
 
-## Solution 1: Enable SCORM Score Reporting (BEST)
 
-**You need to configure the Articulate Rise course to send scores to SCORM.**
 
-### Steps to Enable in Articulate Rise:
+# Debugging Articulate Rise Quiz Score Extraction
 
-1. **Open your course in Articulate Rise editor**
+## Step 1: Manually Extract the Score (To Verify It's Possible)
 
-2. **Go to Course Settings** (usually gear icon or menu)
+1. **Complete the Articulate Rise quiz** (answer all questions)
+2. **Open Browser DevTools** (F12)
+3. **Go to Console tab**
+4. **Copy-paste this code:**
 
-3. **Find "Reporting" or "SCORM" section**
-
-4. **Enable these options:**
-   - ☑ "Report to LMS"
-   - ☑ "Report SCORM Score"
-   - ☑ "Send cmi.score.raw"
-   - ☑ "Send cmi.score.max"
-
-5. **For quiz settings:**
-   - Make sure quiz is set to "Graded" (not "Survey")
-   - Points per question should be set (e.g., 1 point each)
-   - Total possible score should calculate correctly
-
-6. **Publish/update the SCORM package**
-
-7. **Re-upload to your LMS**
-
-### Example SCORM Settings in Articulate Rise:
-```
-Course Settings → SCORM/LMS
-✓ Enable Reporting
-✓ Report Completion Status
-✓ Report Score
-✓ Send cmi.score.raw
-✓ Send cmi.score.max
-
-Quiz Settings:
-- Type: Graded
-- Points: 1 per question (or whatever)
-- Passing Score: 70% (or your threshold)
-```
-
----
-
-## Solution 2: Extract Score from Quiz Results (If you can't modify course)
-
-If you **don't have access to modify the Articulate Rise course**, use this extraction method.
-
-**Replace your `finalizeWithScore()` function with the code in `ARTICULATE_RISE_SCORE_EXTRACTION.js`**
-
-This will attempt to:
-1. First check SCORM API (in case course has score)
-2. Then scan the iframe content for quiz results
-3. Look for patterns like "Question 4 of 8" or "You scored 85%"
-4. Extract and send the score to your backend
-
-### Limitations of Extraction Method:
-- ⚠️ Depends on page structure (if Articulate changes HTML layout, extraction breaks)
-- ⚠️ Less reliable than proper SCORM implementation
-- ✅ Better than nothing!
-
----
-
-## Solution 3: Contact Articulate Support/Your Course Creator
-
-Send them:
-
-> "We're using our own LMS with your SCORM 1.2 package. The course shows quiz questions and tracks answers correctly, but it's not reporting scores back to the LMS via the SCORM API. We need:
-> 
-> 1. `cmi.core.score.raw` = total points earned (e.g., 7)
-> 2. `cmi.core.score.max` = maximum possible points (e.g., 10)
-> 3. These should be set when the quiz is completed
-> 
-> Can you check if SCORM score reporting is enabled in your course settings?"
-
----
-
-## How to Verify SCORM Score Reporting
-
-### Check 1: Look at imsmanifest.xml
-
-Your manifest shows:
-```xml
-<metadata>
-  <schema>ADL SCORM</schema>
-  <schemaversion>1.2</schemaversion>
-</metadata>
-```
-
-✅ It's SCORM 1.2, so it should support score reporting.
-
-### Check 2: Inspect the SCORM Driver Code
-
-In your SCORM package, look for `scormdriver/lms-interface.js`:
-
-**If you see code like this:**
 ```javascript
-// GOOD - Setting SCORM scores
-API.LMSSetValue('cmi.core.score.raw', quizScore);
-API.LMSSetValue('cmi.core.score.max', totalPoints);
+// Get the iframe containing the course
+var frame = document.getElementById('scormFrame');
+if (frame && frame.contentWindow) {
+    var iw = frame.contentWindow;
+    var doc = iw.document;
+    
+    console.log('=== ARTICULATE RISE QUIZ CONTENT ===');
+    console.log(doc.body.innerText.substring(0, 2000));
+    
+    // Look for quiz results
+    var text = doc.body.innerText;
+    console.log('\n=== SEARCHING FOR SCORE PATTERNS ===');
+    
+    // Pattern 1: "X of Y"
+    var xyMatch = text.match(/(\d+)\s+of\s+(\d+)/);
+    if (xyMatch) {
+        console.log('✓ Found "X of Y" pattern:', xyMatch[0]);
+        console.log('  Correct answers: ' + xyMatch[1]);
+        console.log('  Total questions: ' + xyMatch[2]);
+        var percentage = (parseInt(xyMatch[1]) / parseInt(xyMatch[2])) * 100;
+        console.log('  Percentage: ' + percentage.toFixed(1) + '%');
+    }
+    
+    // Pattern 2: "Correctly selected"
+    var correctCount = (text.match(/Correctly selected/gi) || []).length;
+    console.log('✓ Found "Correctly selected" count:', correctCount);
+    
+    // Pattern 3: "You scored" or "You got"
+    var scoreMatch = text.match(/You\s+(?:scored|got)\s+(\d+(?:\.\d+)?)\s*%/i);
+    if (scoreMatch) {
+        console.log('✓ Found "You scored/got" pattern:', scoreMatch[0]);
+        console.log('  Score: ' + scoreMatch[1] + '%');
+    }
+    
+} else {
+    console.error('Cannot access iframe');
+}
 ```
 
-✅ Score reporting is enabled
+**What to expect:**
 
-**If you see:**
+✅ **If working correctly:**
+```
+=== ARTICULATE RISE QUIZ CONTENT ===
+Question 4 of 8
+What is the first step...
+Correctly selected ✓
+...
+
+=== SEARCHING FOR SCORE PATTERNS ===
+✓ Found "X of Y" pattern: 4 of 8
+  Correct answers: 4
+  Total questions: 8
+  Percentage: 50%
+✓ Found "Correctly selected" count: 4
+```
+
+---
+
+## Step 2: Verify SCORM API (Optional)
+
+Run this in console to check if Articulate Rise is actually setting SCORM scores:
+
 ```javascript
-// BAD - Only tracking completion
-API.LMSSetValue('cmi.core.lesson_status', 'completed');
-// No score being set!
+console.log('=== CHECKING SCORM API ===');
+
+// Check parent/top window for API
+var api = window.API || window.parent.API || window.top.API;
+if (!api) api = window.API_1484_11 || window.parent.API_1484_11;
+
+if (api && typeof api.GetValue === 'function') {
+    console.log('✓ SCORM API found');
+    console.log('Raw Score:', api.GetValue('cmi.core.score.raw'));
+    console.log('Max Score:', api.GetValue('cmi.core.score.max'));
+    console.log('Lesson Status:', api.GetValue('cmi.core.lesson_status'));
+} else {
+    console.log('✗ SCORM API not available to this context');
+}
+
+// Check shim values
+console.log('\n=== SCORM SHIM VALUES ===');
+console.log('__scorm_shim_lastValues:', window.__scorm_shim_lastValues || {});
 ```
 
-❌ Score reporting is disabled
-
----
-
-## Immediate Action Plan
-
-### PRIORITY 1: Quick Fix (5 minutes)
-1. Replace your `finalizeWithScore()` function with code from `ARTICULATE_RISE_SCORE_EXTRACTION.js`
-2. Test if it now captures quiz scores
-3. Check console for score extraction logs
-
-### PRIORITY 2: Proper Fix (24-48 hours)
-1. Contact your Articulate Rise course provider/creator
-2. Ask them to enable SCORM score reporting in course settings
-3. Have them republish the SCORM package
-4. Re-upload to your LMS
-5. Test again with proper SCORM API score data
-
-### PRIORITY 3: Fallback (If priority 2 fails)
-1. Keep the extraction method as permanent solution
-2. Document that this course uses HTML-based score extraction
-3. Monitor for changes that might break extraction
-
----
-
-## Expected Results After Fix
-
-### BEFORE:
+**If score reporting is enabled:**
 ```
-Console: Raw Score = empty, Max Score = empty
-Database: RawScore = null, MaxScore = null
+Raw Score: 4
+Max Score: 8
+Lesson Status: completed
 ```
 
-### AFTER (With extraction method):
+**If score reporting is disabled:**
 ```
-Console: Score data extracted: {actualScore: 7, maxScore: 10, percentage: 70}
-Database: RawScore = 7, MaxScore = 10
-Display: "Completed (score: 7/10)"
+Raw Score:          ← Empty!
+Max Score:          ← Empty!
+Lesson Status: completed
 ```
 
 ---
 
-## Testing the Extract Method
+## Step 3: Get the Exact Quiz HTML Structure
 
-1. Complete the Articulate Rise course quiz
-2. Note your score (e.g., "You got 7 out of 10 correct")
-3. Click "Complete" button
-4. Check browser console for:
+Run this to see exactly how Articulate Rise displays the results:
+
+```javascript
+var frame = document.getElementById('scormFrame');
+if (frame && frame.contentDocument) {
+    var doc = frame.contentDocument;
+    
+    // Find elements that might contain score info
+    console.log('=== SEARCHING FOR QUIZ RESULT ELEMENTS ===');
+    
+    // Look for divs with score-related text
+    var allDivs = doc.querySelectorAll('div');
+    var scoreElements = [];
+    
+    allDivs.forEach(function(div) {
+        var text = div.innerText || '';
+        if (text.match(/\d+\s+(?:of|\/)\s+\d+/) || 
+            text.match(/Correctly|selected|score|percentage/i) ||
+            text.match(/You\s+(?:scored|got)/i)) {
+            scoreElements.push({
+                text: text.substring(0, 100),
+                classes: div.className,
+                id: div.id
+            });
+        }
+    });
+    
+    console.log('Found', scoreElements.length, 'potential score elements:');
+    scoreElements.forEach(function(el, i) {
+        console.log(i, ':', el);
+    });
+}
+```
+
+This helps identify the exact HTML structure for reliable extraction.
+
+---
+
+## Step 4: Implementation Checklist
+
+### Before Implementing Extraction:
+
+- [ ] I've manually run the extraction code above
+- [ ] I can see quiz results on the page
+- [ ] The "X of Y" pattern or "Correctly selected" count appears
+- [ ] Console shows score can be extracted
+
+### To Implement:
+
+1. **Replace your `finalizeWithScore()` function** with code from `ARTICULATE_RISE_SCORE_EXTRACTION.js`
+
+2. **Restart your LMS application** (rebuild ASP.NET if needed)
+
+3. **Complete another course quiz**
+
+4. **Check console for:**
    ```
-   Score from SCORM API: ...
-   OR
-   Score from "X of Y" pattern: {actualScore: 7, maxScore: 10, ...}
+   Score from "X of Y" pattern: {actualScore: 7, maxScore: 10, percentage: 70}
+   Complete handler posting payload {..., RawScore: 7, MaxScore: 10, ...}
    ```
-5. Check database - should now have RawScore and MaxScore
+
+5. **Check database:**
+   ```sql
+   SELECT TOP 1 RawScore, MaxScore, IsCompleted, CompletionDate
+   FROM dbo.citSCORMAttempt
+   ORDER BY CompletionDate DESC
+   ```
+   Should show: `RawScore: 7, MaxScore: 10`
 
 ---
 
-## Recommended Database View
+## Common Issues & Fixes
 
-Create a view to handle both proper SCORM and extracted scores:
+### Issue 1: Extraction Finds "Correctly selected" but not "X of Y"
 
-```sql
-CREATE VIEW dbo.vw_ScormAttemptResults AS
-SELECT 
-    citSCORMAttemptID,
-    citSCORMSessionID,
-    CASE 
-        WHEN MaxScore IS NOT NULL AND MaxScore > 0
-        THEN CAST((RawScore / MaxScore) * 100 AS DECIMAL(9,2))
-        WHEN RawScore IS NOT NULL AND RawScore <= 100
-        THEN CAST(RawScore AS DECIMAL(9,2))
-        ELSE NULL
-    END AS CalculatedPercentage,
-    RawScore,
-    MaxScore,
-    IsCompleted,
-    CompletionDate,
-    LessonStatus
-FROM dbo.citSCORMAttempt
-WHERE IsCompleted = 1
-GO
+**Articulate Rise might display results differently. Try this:**
+
+```javascript
+// More aggressive search for any numbers
+var frame = document.getElementById('scormFrame');
+if (frame && frame.contentWindow) {
+    var text = frame.contentWindow.document.body.innerText;
+    
+    // Find ALL occurrences of number patterns
+    var allNumbers = text.match(/\d+/g);
+    console.log('All numbers on page:', allNumbers);
+    
+    // Count correct answers differently
+    var lines = text.split('\n');
+    var correctCount = 0;
+    lines.forEach(function(line) {
+        if (line.includes('Correctly selected')) correctCount++;
+    });
+    console.log('Total correct answers:', correctCount);
+}
 ```
 
 ---
 
-## Summary
+### Issue 2: Score Extracts but Dashboard Still Shows Null
 
-| Step | Action | Priority |
-|------|--------|----------|
-| 1 | Implement extraction method | HIGH |
-| 2 | Contact course provider to enable SCORM score reporting | HIGH |
-| 3 | Re-publish/re-upload course with score enabled | MEDIUM |
-| 4 | Test with proper SCORM implementation | MEDIUM |
-| 5 | Keep extraction as fallback for other courses | LOW |
+**Check these:**
 
-The **proper solution is having the course send real SCORM data**, but the **extraction method will work as a temporary fix**.
+1. Your C# controller is receiving the values:
+   ```csharp
+   System.Diagnostics.Debug.WriteLine($"RawScore: {rq.RawScore}, MaxScore: {rq.MaxScore}");
+   ```
+
+2. Database column exists:
+   ```sql
+   SELECT * FROM INFORMATION_SCHEMA.COLUMNS 
+   WHERE TABLE_NAME = 'citSCORMAttempt' AND COLUMN_NAME = 'MaxScore'
+   ```
+
+3. Stored procedure is saving values:
+   ```sql
+   SELECT RawScore, MaxScore FROM dbo.citSCORMAttempt WHERE citSCORMAttemptID = 49
+   ```
+
+---
+
+### Issue 3: Extraction Works But Different Courses Have Different Layouts
+
+**Solution:** Make extraction more flexible:
+
+```javascript
+// Try multiple extraction strategies
+var actualScore = null;
+var maxScore = null;
+
+// Strategy 1: Look for patterns
+var patterns = [
+    /(\d+)\s+of\s+(\d+)/,           // "7 of 10"
+    /(\d+)\s*\/\s*(\d+)/,            // "7/10"
+    /Score:\s*(\d+)\/(\d+)/i         // "Score: 7/10"
+];
+
+var text = frame.contentWindow.document.body.innerText;
+for (var i = 0; i < patterns.length; i++) {
+    var match = text.match(patterns[i]);
+    if (match) {
+        actualScore = parseInt(match[1], 10);
+        maxScore = parseInt(match[2], 10);
+        console.log('Found score with pattern', i, ':', actualScore, '/', maxScore);
+        break;
+    }
+}
+```
+
+---
+
+## Final Verification Checklist
+
+After implementing extraction:
+
+- [ ] Quiz appears in Articulate Rise course
+- [ ] Questions have correct/incorrect feedback
+- [ ] Completion button appears at end
+- [ ] Console shows score extraction log
+- [ ] Alert shows "Completed (score: 7/10)"
+- [ ] Database RawScore column has value (not null)
+- [ ] Database MaxScore column has value (not null)
+- [ ] Dashboard displays score correctly
+
+---
+
+## Still Not Working?
+
+If after all this the score is still not being captured:
+
+1. **Check the imsmanifest.xml** - confirm it's a valid SCORM 1.2 package
+2. **Check scormdriver/lms-interface.js** - look for SetValue calls
+3. **Contact Articulate support** - ask if score reporting needs to be enabled
+4. **Consider upgrading course** - newer Articulate Storyline/Rise versions handle SCORM better
 
