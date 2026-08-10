@@ -1,0 +1,551 @@
+Here is the output 
+
+remote container already initialized 
+[innerForwarder] posted SCORM_SCORE_UPDATE {raw: '13%', percent: 13, correct: null, total: null, source: 'dom:percent'}
+SCORM_SCORE_UPDATE handled (raw,percent,src)= 13% 13 dom:percent
+Score data extracted: {actualScore: null, maxScore: null, percentage: 13, source: 'dom:percent'}
+Complete handler posting payload {citSCORMAttemptID: 49, citSCORMSessionID: 410, RawScore: null, MaxScore: null, ScorePercentage: 13, …}
+[innerForwarder] posted SCORM_SCORE_UPDATE {raw: null, percent: null, correct: null, total: null, source: 'probe'}
+SCORM_SCORE_UPDATE handled (raw,percent,src)= null null probe
+The thread 47584 has exited with code 0 (0x0).
+The thread 34976 has exited with code 0 (0x0).
+The thread 46060 has exited with code 0 (0x0).
+The thread 4712 has exited with code 0 (0x0).
+The thread 45864 has exited with code 0 (0x0).
+The thread 40200 has exited with code 0 (0x0).
+CompleteAttempt - AttemptID: 49, RawScore: , MaxScore: , Percentage: 13, FinalScore: 13
+CompleteAttempt OK {"success":true,"message":"Attempt marked complete and session closed.","score":{"raw":null,"max":null,"percentage":13}}
+The thread 13412 has exited with code 0 (0x0).
+
+
+Here is the _LearnerScormPlayer 
+
+@model LMS.Areas.OnlineTraining.Models.ScormLearnerPlayerModel
+
+@{
+    Layout = null;
+    var packageID = Model.citSCORMPackageID;
+    var launchFile = Model.LaunchFile ?? "index.html";
+
+    string packageFolderName = "UNKNOWN";
+    if (!string.IsNullOrEmpty(Model.StoredDirectoryPath))
+    {
+        try { packageFolderName = new System.IO.DirectoryInfo(Model.StoredDirectoryPath).Name; } catch { packageFolderName = "UNKNOWN"; }
+    }
+
+    string rootVirtualBase = $"~/Files/ScormFileUpload/{Model.citID}/{packageFolderName}/";
+    string rootPhysicalBase = Server.MapPath(rootVirtualBase);
+
+    string candidate1Physical = System.IO.Path.Combine(rootPhysicalBase ?? "", launchFile);
+    string candidate2Physical = System.IO.Path.Combine(rootPhysicalBase ?? "", "scormcontent", launchFile);
+
+    string proxyFile;
+    string staticLaunchUrl;
+    if (System.IO.File.Exists(candidate1Physical))
+    {
+        proxyFile = launchFile;
+        staticLaunchUrl = Url.Content(rootVirtualBase + launchFile);
+    }
+    else if (System.IO.File.Exists(candidate2Physical))
+    {
+        proxyFile = "scormcontent/" + launchFile;
+        staticLaunchUrl = Url.Content(rootVirtualBase + "scormcontent/" + launchFile);
+    }
+    else
+    {
+        proxyFile = "scormcontent/" + launchFile;
+        staticLaunchUrl = Url.Content(rootVirtualBase + "scormcontent/" + launchFile);
+    }
+
+    var proxyUrl = Url.Action("ServeScorm", "ScormTraining", new { area = "OnlineTraining", packageId = Model.citSCORMPackageID, file = proxyFile });
+    var saveTrackingUrl = Url.Action("SaveTracking", "ScormTraining", new { area = "OnlineTraining" });
+    var completeAttemptUrl = Url.Action("CompleteAttempt", "ScormTraining", new { area = "OnlineTraining" });
+}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@Model.PackageName - SCORM Player</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+            background: #fff;
+        }
+
+        .header {
+            background: linear-gradient(135deg,#18abc0,#0f8fa3);
+            color: #fff;
+            padding: 12px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: fixed;
+            top: 0;
+            width: 100%;
+            z-index: 1000;
+            box-shadow: 0 2px 8px rgba(0,0,0,.08);
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .scorm-frame {
+            width: 100%;
+            height: calc(100vh - 64px);
+            border: 0;
+            margin-top: 64px;
+            display: block;
+        }
+
+        .btn {
+            background: rgba(255,255,255,.14);
+            border: 1px solid rgba(255,255,255,.22);
+            color: #fff;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+            .btn:hover {
+                background: rgba(255,255,255,.2);
+            }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div>
+            <strong>📚 @Model.PackageName</strong>
+            <small style="opacity:.85; margin-left:8px;">Attempt #@Model.AttemptNumber</small>
+        </div>
+        <div class="header-actions">
+            <button id="complete-btn" class="btn" type="button">Complete</button>
+            <button class="btn" onclick="toggleFullscreen()">⛶ Fullscreen</button>
+            <button class="btn" onclick="window.close()">✕ Close</button>
+        </div>
+    </div>
+
+    <script>
+        var SCORM = @Html.Raw(System.Web.Helpers.Json.Encode(new {
+            packageId = Model.citSCORMPackageID,
+            attemptId = Model.citSCORMAttemptID,
+            sessionId = Model.citSCORMSessionID,
+            sessionGuid = Model.SessionGUID,
+            userId = (String.IsNullOrEmpty(Model.LearnerKMID) ? (object)null : Model.LearnerKMID),
+            scormVersion = (Model.ScormVersion ?? "1.2")
+        }));
+        var PROXY_URL = @Html.Raw(System.Web.Helpers.Json.Encode(proxyUrl));
+        var SAVE_TRACKING_URL = @Html.Raw(System.Web.Helpers.Json.Encode(saveTrackingUrl));
+        var COMPLETE_ATTEMPT_URL = @Html.Raw(System.Web.Helpers.Json.Encode(completeAttemptUrl));
+
+        // larger wait to catch slow engines
+        var SCORE_WAIT_MS = 3000;
+    </script>
+
+    <script>
+        (function () {
+            var SAVE = SAVE_TRACKING_URL;
+            var COMPLETE = COMPLETE_ATTEMPT_URL;
+            var COMMIT_THROTTLE = 800;
+
+            var lastValues = {};
+            try { window.__scorm_shim_lastValues = lastValues; } catch (e) { }
+
+            // keep last reported score for fast access
+            try { window.__lastReportedScore = null; } catch (e) { }
+
+            function postJson(url, payload) {
+                return fetch(url, {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: { 'Content-Type': 'application/json; charset=utf-8' },
+                    body: JSON.stringify(payload)
+                }).then(function (res) {
+                    if (!res.ok) return res.text().then(function (t) { return Promise.reject({ status: res.status, body: t }); });
+                    return res.text().then(function (t) { try { return t ? JSON.parse(t) : null; } catch (e) { return t; } });
+                });
+            }
+
+            function saveOne(element, value, committed) {
+                var uid = (SCORM && SCORM.userId) ? (typeof SCORM.userId === 'number' ? SCORM.userId : parseInt(SCORM.userId, 10)) : null;
+                if (!uid) return Promise.reject({ message: 'Missing userId' });
+                var payload = { citSCORMSessionID: SCORM.sessionId || 0, citSCORMAttemptID: SCORM.attemptId || 0, UserID: uid, citSCORMPackageID: SCORM.packageId || 0, CMIElement: element, CMIValue: value, CMITimestamp: new Date().toISOString(), IsCommitted: committed ? 1 : 0 };
+                return postJson(SAVE, payload);
+            }
+
+            function commitMarker() {
+                var now = Date.now();
+                if (window.__lastCommitTs && now - window.__lastCommitTs < COMMIT_THROTTLE) return;
+                window.__lastCommitTs = now;
+                saveOne('lms.commit', '1', true).catch(function () { });
+            }
+
+            function parseScore(raw) {
+                if (raw === undefined || raw === null || raw === '') return null;
+                try {
+                    var s = ('' + raw).trim().replace(',', '.');
+                    var m = s.match(/^([0-9]+(?:\.[0-9]+)?)\s*%$/);
+                    if (m) return parseFloat(m[1]);
+                    m = s.match(/^([0-9]+(?:\.[0-9]+)?)\s*\/\s*([0-9]+(?:\.[0-9]+)?)$/);
+                    if (m && parseFloat(m[2]) !== 0) return (parseFloat(m[1]) / parseFloat(m[2])) * 100;
+                    var n = parseFloat(s);
+                    if (!isNaN(n)) return (n <= 1 ? n * 100 : n);
+                } catch (e) { }
+                return null;
+            }
+
+            function isCompletedStatus(v) {
+                if (v === undefined || v === null) return false;
+                var s = ('' + v).toLowerCase().trim();
+                return s === 'completed' || s === 'passed' || s === 'success' || s === 'completed,passed' || s === 'completed/passed';
+            }
+
+            // aggressive wait for score; first checks __lastReportedScore (fast)
+            function waitForScore(timeoutMs) {
+                return new Promise(function (resolve) {
+                    var elapsed = 0;
+                    var interval = 150;
+                    function tryOnce() {
+                        try {
+                            // first: lastReportedScore if set by message handler
+                            if (window.__lastReportedScore !== undefined && window.__lastReportedScore !== null) {
+                                var rr = parseFloat(('' + window.__lastReportedScore).replace(',', '.'));
+                                if (!isNaN(rr)) { resolve(rr <= 1 ? rr * 100 : rr); return; }
+                            }
+                            // second: shim lastValues
+                            var lv = window.__scorm_shim_lastValues || {};
+                            var keys = ['cmi.core.score.raw', 'cmi.score.raw', 'cmi.score.scaled', 'cmi.core.score.scaled'];
+                            for (var i = 0; i < keys.length; i++) {
+                                var v = lv[keys[i]];
+                                if (v !== undefined && v !== null && v !== '') {
+                                    var p = parseScore(v);
+                                    if (p !== null) { resolve(p); return; }
+                                }
+                            }
+                            // third: forwarded window._forwardedValues
+                            if (window._forwardedValues) {
+                                var f = window._forwardedValues['cmi.core.score.raw'] || window._forwardedValues['cmi.score.raw'];
+                                if (f) { var pf = parseScore(f); if (pf !== null) { resolve(pf); return; } }
+                            }
+                            // vendor heuristics inside inner frame
+                            try {
+                                var frame = document.getElementById('scormFrame');
+                                if (frame && frame.contentWindow) {
+                                    var iw = frame.contentWindow;
+                                    if (typeof iw.GetPlayer === 'function') {
+                                        try {
+                                            var player = iw.GetPlayer();
+                                            if (player && typeof player.GetVar === 'function') {
+                                                var val = player.GetVar('Score') || player.GetVar('PlayerScore') || player.GetVar('QuizScore');
+                                                var pv = parseScore(val);
+                                                if (pv !== null) { resolve(pv); return; }
+                                            }
+                                        } catch (e) { }
+                                    }
+                                    if (iw.cp && typeof iw.cp.getVariableValue === 'function') {
+                                        try {
+                                            var cv = iw.cp.getVariableValue('cpInfoScore') || iw.cp.getVariableValue('cpQuizInfoPointsscored');
+                                            var pc = parseScore(cv);
+                                            if (pc !== null) { resolve(pc); return; }
+                                        } catch (e) { }
+                                    }
+                                    try {
+                                        if (iw.scorm_runtime) {
+                                            var sr = iw.scorm_runtime._score || iw.scorm_runtime.score;
+                                            var ps = parseScore(sr);
+                                            if (ps !== null) { resolve(ps); return; }
+                                        }
+                                    } catch (e) { }
+                                    // inner DOM heuristics
+                                    try {
+                                        var doc = frame.contentDocument || frame.contentWindow.document;
+                                        if (doc) {
+                                            var text = (doc.body && doc.body.innerText) || '';
+                                            var m = text.match(/([0-9]{1,3}(?:\.[0-9]+)?)\s*%/);
+                                            if (m) { resolve(parseFloat(m[1])); return; }
+                                        }
+                                    } catch (e) { }
+                                }
+                            } catch (e) { }
+                        } catch (e) { }
+                        elapsed += interval;
+                        if (elapsed >= timeoutMs) { resolve(null); return; }
+                        setTimeout(tryOnce, interval);
+                    }
+                    tryOnce();
+                });
+            }
+
+            // expose wait
+            try { window.__scorm_waitForScore = waitForScore; } catch (e) { }
+
+            // message listener - set __lastReportedScore ASAP and persist
+            window.addEventListener('message', function (ev) {
+                if (ev.origin !== window.location.origin) return;
+                try {
+                    var d = ev.data || {};
+                    if (d && d.type === 'SCORM_SCORE_UPDATE') {
+                        // try scorePercent first
+                        var percent = null;
+                        if (d.scorePercent !== undefined && d.scorePercent !== null) {
+                            percent = parseFloat(('' + d.scorePercent).replace(',', '.'));
+                            if (!isNaN(percent)) percent = percent <= 1 ? percent * 100 : percent;
+                        }
+                        // fallback: parse raw string, look for fraction "2/16"
+                        if (percent === null && d.scoreRaw !== undefined && d.scoreRaw !== null) {
+                            var raw = '' + d.scoreRaw;
+                            // fraction pattern
+                            var frac = raw.match(/^\s*([0-9]+)\s*\/\s*([0-9]+)\s*$/);
+                            if (frac) {
+                                var correct = parseInt(frac[1], 10), total = parseInt(frac[2], 10);
+                                if (!isNaN(correct) && !isNaN(total) && total > 0) {
+                                    percent = (correct / total) * 100;
+                                    // optional: send correct & total to server instead of percent
+                                    window.__lastReportedCount = { correct: correct, total: total };
+                                }
+                            } else {
+                                // attempt numeric parse (like "12.5" or "12.5%")
+                                var p = parseFloat(raw.replace('%', '').replace(',', '.'));
+                                if (!isNaN(p)) percent = (p <= 1 ? p * 100 : p);
+                            }
+                        }
+
+                        // set global lastReportedScore (percent) and persist
+                        window.__lastReportedScore = (percent !== null ? percent : null);
+                        // keep raw for debugging
+                        window.__lastReportedRaw = d.scoreRaw === undefined ? null : d.scoreRaw;
+                        window.__lastReportedSource = d.source || null;
+
+                        // persist CMI score as before (we still post the raw string to SaveTracking so DB has original)
+                        try {
+                            if (d.scoreRaw !== undefined && d.scoreRaw !== null) {
+                                saveOne('cmi.core.score.raw', String(d.scoreRaw), false).catch(function () { });
+                            } else if (percent !== null) {
+                                // if raw absent use percent formatted string
+                                saveOne('cmi.core.score.raw', String(percent), false).catch(function () { });
+                            }
+                        } catch (e) { }
+
+                        // trigger finish if appropriate
+                        setTimeout(function () { try { finishIfCompleted(); } catch (e) { } }, 120);
+                        console.debug('SCORM_SCORE_UPDATE handled (raw,percent,src)=', d.scoreRaw, percent, d.source);
+                    }
+                } catch (e) { }
+            }, false);
+
+            // shim API so same-origin SCO can call LMSSetValue and be persisted
+            var shimApi = {
+                LMSInitialize: function () { return 'true'; },
+                LMSFinish: function () { commitMarker(); setTimeout(function () { try { finishIfCompleted(); } catch (e) { } }, 250); return 'true'; },
+                LMSGetValue: function (k) { return lastValues[k] !== undefined ? String(lastValues[k]) : ''; },
+                LMSSetValue: function (k, v) {
+                    try {
+                        lastValues[k] = v;
+                        // update lastReportedScore if it's a score key
+                        if (/score/i.test(k)) {
+                            var p = parseScore(v);
+                            if (p !== null) window.__lastReportedScore = p;
+                        }
+                        saveOne(k, v, false).catch(function () { });
+                        var lk = (k || '').toLowerCase();
+                        if (lk.indexOf('lesson_status') !== -1 || lk.indexOf('completion_status') !== -1 || lk.indexOf('success_status') !== -1) {
+                            if (isCompletedStatus(v)) {
+                                commitMarker();
+                                setTimeout(function () { try { finishIfCompleted(); } catch (e) { } }, 200);
+                            }
+                        }
+                    } catch (e) { }
+                    return 'true';
+                },
+                LMSCommit: function () { commitMarker(); return 'true'; },
+                LMSGetLastError: function () { return '0'; },
+                LMSGetErrorString: function () { return ''; },
+                LMSGetDiagnostic: function () { return ''; }
+            };
+
+            shimApi.Initialize = shimApi.LMSInitialize;
+            shimApi.Terminate = shimApi.LMSFinish;
+            shimApi.GetValue = shimApi.LMSGetValue;
+            shimApi.SetValue = shimApi.LMSSetValue;
+            shimApi.Commit = shimApi.LMSCommit;
+
+            function safeDefine(target, name, value) {
+                try { Object.defineProperty(target, name, { value: value, writable: true, configurable: true }); return true; }
+                catch (e) { try { target[name] = value; return true; } catch (ex) { return false; } }
+            }
+
+            safeDefine(window, 'API', shimApi);
+            safeDefine(window, 'API_1484_11', shimApi);
+            try { if (window.parent && window.parent !== window) safeDefine(window.parent, 'API', shimApi); } catch (e) { }
+            try { if (window.parent && window.parent !== window) safeDefine(window.parent, 'API_1484_11', shimApi); } catch (e) { }
+            try { if (window.top && window.top !== window) safeDefine(window.top, 'API', shimApi); } catch (e) { }
+            try { if (window.top && window.top !== window) safeDefine(window.top, 'API_1484_11', shimApi); } catch (e) { }
+
+            console.debug('Top LMS shim installed -> SaveTracking:', SAVE, ' CompleteAttempt:', COMPLETE);
+        })();
+    </script>
+
+    <iframe id="scormFrame" class="scorm-frame" title="SCORM Player" src="@proxyUrl" frameborder="0" sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups"></iframe>
+
+    <script>
+        (function () {
+            var btn = document.getElementById('complete-btn');
+            if (!btn) return;
+
+            btn.addEventListener('click', function () {
+                var self = this;
+                self.disabled = true;
+                self.textContent = 'Completing…';
+
+                // 1) Ask inner to probe for score immediately
+                try {
+                    var f = document.getElementById('scormFrame');
+                    if (f && f.contentWindow) {
+                        f.contentWindow.postMessage({ type: 'SCORM_REQUEST_SCORE' }, location.origin);
+                    }
+                } catch (e) { }
+
+                // 2) Wait for the forwarded score (fast path: __lastReportedScore), give inner 900ms to respond
+                var waitMs = 900;
+                var start = Date.now();
+                (function pollScore() {
+                    var reported = window.__lastReportedScore !== undefined ? window.__lastReportedScore : null;
+                    // Also check shim values
+                    try {
+                        var lv = window.__scorm_shim_lastValues || {};
+                        if (!reported && lv['cmi.core.score.raw']) {
+                            var p = parseFloat(('' + lv['cmi.core.score.raw']).replace(',', '.'));
+                            if (!isNaN(p)) reported = (p <= 1 ? p * 100 : p);
+                        }
+                    } catch (e) { }
+
+                    if (reported !== null) {
+                        // we have a score; persist lesson_status then call CompleteAttempt with score
+                        finalizeWithScore(reported, self);
+                        return;
+                    }
+                    if (Date.now() - start >= waitMs) {
+                        // no score received within wait window -> write lesson_status then post CompleteAttempt (fallback)
+                        finalizeWithScore(null, self);
+                        return;
+                    }
+                    setTimeout(pollScore, 120);
+                })();
+            });
+
+            function finalizeWithScore(score, btnEl) {
+                try {
+                    // write lesson_status to SaveTracking
+                    try {
+                        window.__scorm_shim_lastValues = window.__scorm_shim_lastValues || {};
+                        window.__scorm_shim_lastValues['cmi.core.lesson_status'] = 'completed';
+                    } catch (e) { }
+
+                    fetch(SAVE_TRACKING_URL, {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: { 'Content-Type': 'application/json; charset=utf-8' },
+                        body: JSON.stringify({
+                            citSCORMSessionID: SCORM.sessionId || 0,
+                            citSCORMAttemptID: SCORM.attemptId || 0,
+                            UserID: (function (u) {
+                                if (!u && u !== 0) return null;
+                                if (typeof u === 'number') return Math.floor(u);
+                                var n = parseInt(String(u), 10);
+                                return isNaN(n) ? null : n;
+                            })(SCORM.userId),
+                            citSCORMPackageID: SCORM.packageId || 0,
+                            CMIElement: 'cmi.core.lesson_status',
+                            CMIValue: 'completed',
+                            CMITimestamp: new Date().toISOString(),
+                            IsCommitted: 0
+                        })
+                    }).catch(function () { });
+                } catch (e) { }
+
+                // ==================== KEY FIX ====================
+                // Extract ACTUAL SCORE DATA (correct/total), not just percentage
+                var actualScore = null;
+                var maxScore = null;
+                var percentage = score; // fallback percentage
+
+                // Check if we captured correct/total counts from SCORM_SCORE_UPDATE
+                if (window.__lastReportedCount && window.__lastReportedCount.correct !== undefined) {
+                    actualScore = window.__lastReportedCount.correct;
+                    maxScore = window.__lastReportedCount.total;
+                    percentage = (actualScore / maxScore) * 100;
+                }
+
+                console.debug('Score data extracted:', {
+                    actualScore: actualScore,
+                    maxScore: maxScore,
+                    percentage: percentage,
+                    source: window.__lastReportedSource
+                });
+
+                // ===================================================
+                // Now call CompleteAttempt with ACTUAL score and max score
+                var payload = {
+                    citSCORMAttemptID: SCORM.attemptId || 0,
+                    citSCORMSessionID: SCORM.sessionId || 0,
+                    RawScore: actualScore !== null ? actualScore : null, // ACTUAL POINTS (15)
+                    MaxScore: maxScore !== null ? maxScore : null, // MAX POSSIBLE (100)
+                    ScorePercentage: percentage !== null ? percentage : null, // PERCENTAGE (15%)
+                    IsCompleted: true,
+                    CompletionDate: new Date().toISOString(),
+                    LessonStatus: 'completed',
+                    SessionTime: null,
+                    SuspendData: null
+                };
+
+                console.debug('Complete handler posting payload', payload);
+                fetch(COMPLETE_ATTEMPT_URL, {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: { 'Content-Type': 'application/json; charset=utf-8' },
+                    body: JSON.stringify(payload)
+                })
+                    .then(function (res) {
+                        if (!res.ok) return res.text().then(function (t) { throw { status: res.status, body: t }; });
+                        return res.text();
+                    })
+                    .then(function (txt) {
+                        console.debug('CompleteAttempt OK', txt);
+                        alert('Completed' + (payload.RawScore ? ' (score: ' + payload.RawScore + '/' + (payload.MaxScore || '?') + ')' : ''));
+                    })
+                    .catch(function (err) {
+                        console.error('CompleteAttempt failed', err);
+                        alert('CompleteAttempt failed (see console)');
+                    })
+                    .finally(function () {
+                        btnEl.disabled = false;
+                        btnEl.textContent = 'Complete';
+                    });
+            }
+        })();
+
+        function toggleFullscreen() {
+            try {
+                if (!document.fullscreenElement) document.documentElement.requestFullscreen && document.documentElement.requestFullscreen();
+                else document.exitFullscreen && document.exitFullscreen();
+            } catch (e) { }
+        }
+    </script>
+
+    <script src="~/Scripts/Custom/scorm-bootstrap.js"></script>
+</body>
+</html>
+
+
+can you check why i didnt still get the score of the learner 
